@@ -24,6 +24,10 @@ const migrations = [
     id: "004_enforce_15_char_wasal_code",
     file: "004_enforce_15_char_wasal_code.sql",
   },
+  {
+    id: "005_call_logs",
+    file: "005_call_logs.sql",
+  },
 ];
 
 const expectedTables = [
@@ -39,6 +43,7 @@ const expectedTables = [
   "sticker_favorites",
   "calls",
   "call_participants",
+  "call_logs",
   "polls",
   "poll_options",
   "poll_votes",

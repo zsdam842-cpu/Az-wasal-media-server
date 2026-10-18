@@ -1,9 +1,14 @@
 import type { Server, Socket } from "socket.io";
 
 import { verifyToken } from "../modules/auth/tokens.js";
+import { verifyTokenRemotely } from "../modules/auth/introspection.js";
 import { isConversationMember } from "../modules/conversations/conversations.repository.js";
 import { CALL_EVENTS } from "../calls/call.events.js";
 import { callStore } from "../calls/call.store.js";
+import {
+  insertCallLog,
+  updateCallLogStatus,
+} from "../calls/call.history.js";
 
 import type {
   CallAnswer,
@@ -59,6 +64,12 @@ function scheduleMissedCall(
       return;
     }
 
+    // تسجيل المكالمة الفائتة في سجل المكالمات.
+    void updateCallLogStatus(
+      callId,
+      "missed",
+    ).catch(() => {});
+
     const payload = {
       callId: missedCall.callId,
       userId: "system",
@@ -106,29 +117,44 @@ function isCallParticipant(
 
 export function setupSocket(io: Server): void {
   io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+
+    if (
+      typeof token !== "string" ||
+      token.length === 0
+    ) {
+      next(new Error("AUTH_REQUIRED"));
+      return;
+    }
+
+    // أولًا: التحقق المحلي برمز الخادم نفسه.
     try {
-      const token = socket.handshake.auth?.token;
-
-      if (
-        typeof token !== "string" ||
-        token.length === 0
-      ) {
-        next(new Error("AUTH_REQUIRED"));
-        return;
-      }
-
       const payload = verifyToken(token);
 
-      if (!payload?.userId) {
-        next(new Error("INVALID_TOKEN"));
+      if (payload?.userId) {
+        socket.data.userId = payload.userId;
+        next();
         return;
       }
-
-      socket.data.userId = payload.userId;
-      next();
     } catch {
-      next(new Error("INVALID_TOKEN"));
+      // الرمز ليس موقّعًا بسرّ هذا الخادم:
+      // نتابع بالتحقق الاحتياطي عبر خادم الحسابات.
     }
+
+    // ثانيًا: التحقق عبر خادم الحسابات والرسائل.
+    verifyTokenRemotely(token)
+      .then((remote) => {
+        if (!remote) {
+          next(new Error("INVALID_TOKEN"));
+          return;
+        }
+
+        socket.data.userId = remote.userId;
+        next();
+      })
+      .catch(() => {
+        next(new Error("INVALID_TOKEN"));
+      });
   });
 
   io.on("connection", (socket) => {
@@ -317,6 +343,14 @@ export function setupSocket(io: Server): void {
           payload.type,
         );
 
+        // تسجيل المكالمة في سجل المكالمات الدائم.
+        void insertCallLog({
+          callId: call.callId,
+          callerId: userId,
+          receiverId: payload.receiverId,
+          callType: payload.type,
+        }).catch(() => {});
+
         const callPayload = {
           callId: call.callId,
           callerId: call.callerId,
@@ -371,6 +405,12 @@ export function setupSocket(io: Server): void {
           return;
         }
 
+        // تحديث سجل المكالمات: المكالمة أُجيبت.
+        void updateCallLogStatus(
+          callId,
+          "active",
+        ).catch(() => {});
+
         io.to(
           `user:${acceptedCall.callerId}`,
         ).emit(
@@ -411,6 +451,12 @@ export function setupSocket(io: Server): void {
         if (!rejectedCall) {
           return;
         }
+
+        // تحديث سجل المكالمات: المكالمة رُفضت.
+        void updateCallLogStatus(
+          callId,
+          "rejected",
+        ).catch(() => {});
 
         io.to(
           `user:${rejectedCall.callerId}`,
@@ -453,6 +499,12 @@ export function setupSocket(io: Server): void {
         if (!endedCall) {
           return;
         }
+
+        // تحديث سجل المكالمات: المكالمة انتهت.
+        void updateCallLogStatus(
+          callId,
+          "ended",
+        ).catch(() => {});
 
         const otherUserId =
           endedCall.callerId === userId

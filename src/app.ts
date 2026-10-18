@@ -6,6 +6,7 @@ import usersRoutes from "./modules/users/users.routes.js";
 import conversationsRoutes from "./modules/conversations/conversations.routes.js";
 import messagesRoutes from "./modules/messages/messages.routes.js";
 import mediaRoutes from "./modules/media/media.routes.js";
+import callsRoutes from "./modules/calls/calls.routes.js";
 
 import { requireAuth } from "./middleware/auth.js";
 
@@ -59,10 +60,7 @@ export function createApp() {
 
   app.use(
     "/api/calls",
-    requireAuth,
-    (_req, res) => {
-      res.status(200).json([]);
-    },
+    callsRoutes,
   );
 
   app.use(
