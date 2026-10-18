@@ -59,6 +59,8 @@ export async function getMyCallsController(
           otherName ||
           otherCode ||
           "مستخدم وصال",
+        peerId: isCaller ? row.receiverId : row.callerId,
+        peerCode: otherCode ?? "",
         kind: row.callType === "video" ? "video" : "audio",
         direction,
         status: row.status,
