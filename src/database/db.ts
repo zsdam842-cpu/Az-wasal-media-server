@@ -1,39 +1,25 @@
 import { Pool } from "pg";
 import { env } from "../config/env.js";
 
-const caCertificate = process.env.DATABASE_CA_CERT;
+const caCertificate = process.env.DATABASE_CA_CERT
+  ?.replace(/\\n/g, "\n")
+  .trim();
 
-if (!caCertificate) {
-  throw new Error(
-    "Missing required environment variable: DATABASE_CA_CERT"
-  );
-}
-
-function getConnectionString(): string {
-  const url = new URL(env.databaseUrl);
-
-  // إزالة خيارات SSL من الرابط حتى لا تتعارض
-  // مع شهادة المرجع المصدق التي نحددها أدناه.
-  url.searchParams.delete("sslmode");
-  url.searchParams.delete("sslrootcert");
-  url.searchParams.delete("sslcert");
-  url.searchParams.delete("sslkey");
-
-  return url.toString();
-}
+const databaseOptions = caCertificate
+  ? {
+      ssl: {
+        ca: caCertificate,
+        rejectUnauthorized: true,
+      },
+    }
+  : {};
 
 export const db = new Pool({
-  connectionString: getConnectionString(),
-
-  // التحقق من شهادة Aiven بصورة آمنة.
-  ssl: {
-    ca: caCertificate,
-    rejectUnauthorized: true
-  },
-
+  connectionString: env.databaseUrl,
+  ...databaseOptions,
   max: 20,
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000
+  connectionTimeoutMillis: 10_000,
 });
 
 export async function checkDatabaseConnection(): Promise<void> {
