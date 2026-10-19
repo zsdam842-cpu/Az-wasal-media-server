@@ -144,7 +144,12 @@ export function downloadMedia(
     filePath,
     (error) => {
       if (error && !res.headersSent) {
-        res.status(error.statusCode || 500).json({
+        // sendFile يمرّر خطأ يحمل statusCode، لكن النوع المعلن هو Error فقط.
+        const statusCode =
+          (error as Error & { statusCode?: number })
+            .statusCode || 500;
+
+        res.status(statusCode).json({
           success: false,
           error: "MEDIA_DOWNLOAD_FAILED",
         });

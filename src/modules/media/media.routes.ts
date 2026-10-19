@@ -10,6 +10,7 @@ import {
 } from "./media.controller.js";
 
 import { requireAuth } from "../../middleware/auth.js";
+import { uploadLimiter } from "../../middleware/rateLimit.js";
 
 const router = Router();
 
@@ -79,6 +80,7 @@ const upload = multer({
 router.post(
   "/upload",
   requireAuth,
+  uploadLimiter,
   upload.single("file"),
   uploadMedia,
 );

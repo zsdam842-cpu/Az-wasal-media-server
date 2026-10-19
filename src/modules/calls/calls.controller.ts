@@ -6,6 +6,8 @@ import {
   getCallHistory,
 } from "../../calls/call.history.js";
 
+import { buildIceConfig } from "./ice.js";
+
 /**
  * سجل مكالمات المستخدم الحقيقي من قاعدة البيانات.
  * يعيد القائمة بصيغة متوافقة مع تطبيق Android:
@@ -81,4 +83,34 @@ export async function getMyCallsController(
       error: "CALLS_HISTORY_FAILED",
     });
   }
+}
+
+/**
+ * إعداد ICE (STUN/TURN) للعميل الحالي، ببيانات اعتماد مؤقتة
+ * موقّعة لمعرّف المستخدم نفسه.
+ */
+export async function getIceServersController(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const userId =
+    typeof (req as AuthRequest).userId === "string"
+      ? (req as AuthRequest).userId!
+      : "";
+
+  if (!userId) {
+    res.status(401).json({
+      success: false,
+      error: "AUTH_REQUIRED",
+    });
+    return;
+  }
+
+  const config = await buildIceConfig(userId);
+
+  res.status(200).json({
+    ok: true,
+    success: true,
+    ...config,
+  });
 }

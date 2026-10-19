@@ -1,0 +1,24 @@
+# تشغيل خادم TURN (coturn) لخدمة وصال.
+#
+#   cd coturn
+#   cp .env.example .env      # ثم عدّل TURN_SECRET و TURN_EXTERNAL_IP
+#   docker compose up -d
+#
+# ملاحظة: TURN_SECRET هنا يجب أن يكون مطابقًا تمامًا لقيمة TURN_SECRET
+# في متغيرات بيئة خادم الوسائط، لأن الخادم يوقّع به بيانات الاعتماد المؤقتة.
+services:
+  coturn:
+    build: .
+    image: wasal-coturn:latest
+    container_name: wasal-coturn
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # نطاق الترحيل لازم للـ UDP فقط
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "5349:5349/tcp"
+      - "49160-49200:49160-49200/udp"
+    # على سيرفر بجدار حماية، أفضل أداءً وأبسط إعدادًا:
+    # network_mode: host

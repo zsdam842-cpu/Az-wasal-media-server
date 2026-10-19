@@ -9,16 +9,15 @@ import mediaRoutes from "./modules/media/media.routes.js";
 import callsRoutes from "./modules/calls/calls.routes.js";
 
 import { requireAuth } from "./middleware/auth.js";
+import { checkDatabaseConnection } from "./database/db.js";
+import { env } from "./config/env.js";
 
 export function createApp() {
   const app = express();
 
   app.use(
     cors({
-      origin:
-        process.env.CORS_ORIGIN === "*"
-          ? true
-          : process.env.CORS_ORIGIN,
+      origin: env.corsOrigin,
     }),
   );
 
@@ -33,6 +32,26 @@ export function createApp() {
       status: "ok",
       service: "wasal-server",
     });
+  });
+
+  // جهوزية حقيقية: تفشل (503) عندما لا تكون قاعدة البيانات متاحة،
+  // حتى لا تُبقي منصة الاستضافة نسخة معطوبة في الخدمة.
+  app.get("/health/db", async (_req, res) => {
+    try {
+      await checkDatabaseConnection();
+
+      res.status(200).json({
+        status: "ok",
+        service: "wasal-server",
+        database: "ok",
+      });
+    } catch {
+      res.status(503).json({
+        status: "error",
+        service: "wasal-server",
+        database: "error",
+      });
+    }
   });
 
   app.use(
