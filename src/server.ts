@@ -51,20 +51,24 @@ function shutdown(signal: string): void {
 }
 
 async function start(): Promise<void> {
-  // لا نُشغّل الخادم إن كانت قاعدة البيانات غير متاحة:
-  // بهذا لا يبقى في الخدمة بحالة غير سليمة.
+  // فحص اتصال قاعدة البيانات بحدّ زمني (5 ثوانٍ) وغير مُعطِّل:
+  // الخادم يجب أن يستمع دائمًا، وتُبلَّغ الجهوزية الحقيقية من /health/db.
+  // (تعليق الخادم هنا يعني توقف الخدمة عن الرد تمامًا إن تأخرت القاعدة.)
   try {
-    await checkDatabaseConnection();
+    await Promise.race([
+      checkDatabaseConnection(),
+      new Promise((resolve) => {
+        const timer = setTimeout(resolve, 5_000);
+        if (typeof timer.unref === "function") timer.unref();
+      }),
+    ]);
   } catch (error) {
     console.error(
-      "Database connection failed at startup:",
+      "Database connection check failed at startup:",
       error instanceof Error
         ? error.message
         : "UNKNOWN_ERROR",
     );
-
-    await db.end().catch(() => {});
-    process.exit(1);
   }
 
   httpServer.listen(
